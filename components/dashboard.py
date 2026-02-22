@@ -7,11 +7,17 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime
 from services.calc_service import CalcService
+from services.database import get_user_entries, add_time_entry, get_user_settings
 
 
 def show_dashboard():
     """Show main dashboard"""
     st.markdown('<h1 class="main-header">💼 Dashboard</h1>', unsafe_allow_html=True)
+    
+    user_id = st.session_state.current_user_id
+    settings = get_user_settings(user_id)
+    all_entries = get_user_entries(user_id)
+    weekly_entries = CalcService.get_current_week_entries(all_entries)
     
     # Clock In/Out Section
     col1, col2 = st.columns([2, 1])
@@ -19,7 +25,7 @@ def show_dashboard():
     with col1:
         st.subheader("⏱️ Time Tracking")
         
-        if not st.session_state.clocked_in:
+        if not st.session_state.get('clocked_in', False):
             if st.button("🟢 Clock In", type="primary", use_container_width=True):
                 st.session_state.clocked_in = True
                 st.session_state.clock_in_time = datetime.now()
@@ -38,15 +44,14 @@ def show_dashboard():
                 clock_out_time = datetime.now()
                 hours_worked = CalcService.calculate_hours(st.session_state.clock_in_time, clock_out_time)
                 
-                # Add entry
-                entry = {
-                    'id': len(st.session_state.time_entries) + 1,
-                    'clock_in': st.session_state.clock_in_time.isoformat(),
-                    'clock_out': clock_out_time.isoformat(),
-                    'hours': hours_worked,
-                    'date': st.session_state.clock_in_time.date().isoformat()
-                }
-                st.session_state.time_entries.append(entry)
+                # Add entry to DB
+                add_time_entry(
+                    user_id=user_id,
+                    clock_in=st.session_state.clock_in_time.isoformat(),
+                    clock_out=clock_out_time.isoformat(),
+                    hours=hours_worked,
+                    date=st.session_state.clock_in_time.date().isoformat()
+                )
                 
                 # Reset clock state
                 st.session_state.clocked_in = False
@@ -57,8 +62,7 @@ def show_dashboard():
     
     with col2:
         st.subheader("📅 Current Week")
-        weekly_entries = CalcService.get_current_week_entries()
-        hours = CalcService.calculate_weekly_hours(weekly_entries)
+        hours = CalcService.calculate_weekly_hours(weekly_entries, settings['overtime_threshold'])
         
         st.metric("Total Hours", f"{hours['total']} hrs")
         st.metric("Regular Hours", f"{hours['regular']} hrs")
@@ -69,13 +73,11 @@ def show_dashboard():
     # Weekly Summary
     st.subheader("📊 Weekly Pay Summary")
     
-    weekly_entries = CalcService.get_current_week_entries()
-    
     if len(weekly_entries) > 0:
-        hours = CalcService.calculate_weekly_hours(weekly_entries)
-        gross_pay = CalcService.calculate_gross_pay(hours)
-        deductions = CalcService.calculate_deductions()
-        net_pay = CalcService.calculate_net_pay()
+        hours = CalcService.calculate_weekly_hours(weekly_entries, settings['overtime_threshold'])
+        gross_pay = CalcService.calculate_gross_pay(hours, settings['hourly_rate'], settings['overtime_multiplier'])
+        deductions = CalcService.calculate_deductions(gross_pay['total'], settings)
+        net_pay = CalcService.calculate_net_pay(gross_pay['total'], deductions['total'])
         
         col1, col2, col3 = st.columns(3)
         

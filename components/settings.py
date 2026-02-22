@@ -4,11 +4,15 @@ Configure compensation, benefits, and security settings
 """
 
 import streamlit as st
+from services.database import get_user_settings, update_user_settings
 
 
 def show_settings():
     """Show settings page"""
     st.markdown('<h1 class="main-header">⚙️ Settings</h1>', unsafe_allow_html=True)
+    
+    user_id = st.session_state.current_user_id
+    settings = get_user_settings(user_id)
     
     tab1, tab2, tab3 = st.tabs(["💰 Compensation", "🏥 Benefits", "🔒 Security"])
     
@@ -21,7 +25,7 @@ def show_settings():
             hourly_rate = st.number_input(
                 "Hourly Rate ($)",
                 min_value=0.0,
-                value=st.session_state.settings['hourly_rate'],
+                value=float(settings['hourly_rate']),
                 step=0.50,
                 format="%.2f"
             )
@@ -30,7 +34,7 @@ def show_settings():
             overtime_threshold = st.number_input(
                 "Overtime Threshold (hours/week)",
                 min_value=0.0,
-                value=st.session_state.settings['overtime_threshold'],
+                value=float(settings['overtime_threshold']),
                 step=1.0,
                 format="%.1f"
             )
@@ -39,15 +43,16 @@ def show_settings():
             "Overtime Multiplier",
             min_value=1.0,
             max_value=3.0,
-            value=st.session_state.settings['overtime_multiplier'],
+            value=float(settings['overtime_multiplier']),
             step=0.1,
             format="%.1fx"
         )
         
         if st.button("💾 Save Compensation Settings", type="primary"):
-            st.session_state.settings['hourly_rate'] = hourly_rate
-            st.session_state.settings['overtime_threshold'] = overtime_threshold
-            st.session_state.settings['overtime_multiplier'] = overtime_multiplier
+            settings['hourly_rate'] = hourly_rate
+            settings['overtime_threshold'] = overtime_threshold
+            settings['overtime_multiplier'] = overtime_multiplier
+            update_user_settings(user_id, settings)
             st.success("✅ Compensation settings saved!")
     
     with tab2:
@@ -60,7 +65,7 @@ def show_settings():
             health_employee = st.number_input(
                 "Employee Contribution ($/week)",
                 min_value=0.0,
-                value=st.session_state.settings['health_insurance_employee'],
+                value=float(settings['health_insurance_employee']),
                 step=5.0,
                 format="%.2f"
             )
@@ -69,7 +74,7 @@ def show_settings():
             health_employer = st.number_input(
                 "Employer Contribution ($/week)",
                 min_value=0.0,
-                value=st.session_state.settings['health_insurance_employer'],
+                value=float(settings['health_insurance_employer']),
                 step=5.0,
                 format="%.2f"
             )
@@ -81,7 +86,7 @@ def show_settings():
             dental = st.number_input(
                 "Dental Insurance ($/week)",
                 min_value=0.0,
-                value=st.session_state.settings['dental_insurance'],
+                value=float(settings['dental_insurance']),
                 step=5.0,
                 format="%.2f"
             )
@@ -90,7 +95,7 @@ def show_settings():
             vision = st.number_input(
                 "Vision Insurance ($/week)",
                 min_value=0.0,
-                value=st.session_state.settings['vision_insurance'],
+                value=float(settings['vision_insurance']),
                 step=5.0,
                 format="%.2f"
             )
@@ -102,7 +107,7 @@ def show_settings():
             options=['percentage', 'fixed'],
             format_func=lambda x: "Percentage of Gross Pay" if x == 'percentage' else "Fixed Amount",
             horizontal=True,
-            index=0 if st.session_state.settings['retirement_401k_type'] == 'percentage' else 1
+            index=0 if settings['retirement_401k_type'] == 'percentage' else 1
         )
         
         if retirement_type == 'percentage':
@@ -110,7 +115,7 @@ def show_settings():
                 "Contribution Percentage",
                 min_value=0.0,
                 max_value=100.0,
-                value=st.session_state.settings['retirement_401k_amount'],
+                value=float(settings['retirement_401k_amount']),
                 step=0.5,
                 format="%.1f%%"
             )
@@ -118,18 +123,19 @@ def show_settings():
             retirement_amount = st.number_input(
                 "Fixed Contribution ($/week)",
                 min_value=0.0,
-                value=st.session_state.settings['retirement_401k_amount'],
+                value=float(settings['retirement_401k_amount']),
                 step=5.0,
                 format="%.2f"
             )
         
         if st.button("💾 Save Benefits Settings", type="primary"):
-            st.session_state.settings['health_insurance_employee'] = health_employee
-            st.session_state.settings['health_insurance_employer'] = health_employer
-            st.session_state.settings['dental_insurance'] = dental
-            st.session_state.settings['vision_insurance'] = vision
-            st.session_state.settings['retirement_401k_type'] = retirement_type
-            st.session_state.settings['retirement_401k_amount'] = retirement_amount
+            settings['health_insurance_employee'] = health_employee
+            settings['health_insurance_employer'] = health_employer
+            settings['dental_insurance'] = dental
+            settings['vision_insurance'] = vision
+            settings['retirement_401k_type'] = retirement_type
+            settings['retirement_401k_amount'] = retirement_amount
+            update_user_settings(user_id, settings)
             st.success("✅ Benefits settings saved!")
     
     with tab3:
@@ -137,37 +143,19 @@ def show_settings():
         
         biometric = st.checkbox(
             "🔐 Enable Biometric Authentication",
-            value=st.session_state.settings['biometric_enabled']
-        )
-        
-        two_factor = st.checkbox(
-            "📱 Enable Two-Factor Authentication",
-            value=st.session_state.settings['two_factor_enabled']
+            value=bool(settings['biometric_enabled'])
         )
         
         st.markdown("---")
         
         st.markdown("#### Data Management")
         
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            if st.button("🗑️ Clear All Data", type="secondary", use_container_width=True):
-                if st.session_state.get('confirm_clear', False):
-                    st.session_state.time_entries = []
-                    st.session_state.confirm_clear = False
-                    st.success("✅ All data cleared!")
-                    st.rerun()
-                else:
-                    st.session_state.confirm_clear = True
-                    st.warning("⚠️ Click again to confirm deletion")
-        
-        with col2:
-            if st.button("🚪 Logout", use_container_width=True):
-                st.session_state.authenticated = False
-                st.rerun()
+        if st.button("🚪 Logout", use_container_width=True):
+            st.session_state.authenticated = False
+            st.session_state.current_user_id = None
+            st.rerun()
         
         if st.button("💾 Save Security Settings", type="primary"):
-            st.session_state.settings['biometric_enabled'] = biometric
-            st.session_state.settings['two_factor_enabled'] = two_factor
+            settings['biometric_enabled'] = biometric
+            update_user_settings(user_id, settings)
             st.success("✅ Security settings saved!")

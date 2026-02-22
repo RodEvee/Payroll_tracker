@@ -10,6 +10,7 @@ from components.auth import show_authentication
 from components.dashboard import show_dashboard
 from components.history import show_history
 from components.settings import show_settings
+from services.database import init_db
 
 
 # Page configuration
@@ -23,6 +24,9 @@ st.set_page_config(
 
 def main():
     """Main application"""
+    # Initialize database
+    init_db()
+    
     # Initialize session and styles
     initialize_session_state()
     apply_custom_styles()
@@ -45,8 +49,11 @@ def main():
             
             # Quick Stats
             st.markdown("### 📊 Quick Stats")
-            total_entries = len(st.session_state.time_entries)
-            total_hours = sum(entry['hours'] for entry in st.session_state.time_entries)
+            
+            from services.database import get_user_entries
+            all_entries = get_user_entries(st.session_state.current_user_id) if st.session_state.current_user_id else []
+            total_entries = len(all_entries)
+            total_hours = sum(entry['hours'] for entry in all_entries)
             
             st.metric("Total Entries", total_entries)
             st.metric("Total Hours", f"{total_hours:.1f} hrs")

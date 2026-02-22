@@ -7,13 +7,17 @@ import streamlit as st
 import pandas as pd
 import json
 from datetime import datetime, timedelta, date
+from services.database import get_user_entries
 
 
 def show_history():
     """Show time entry history"""
     st.markdown('<h1 class="main-header">📅 History & Reports</h1>', unsafe_allow_html=True)
     
-    if len(st.session_state.time_entries) == 0:
+    user_id = st.session_state.current_user_id
+    all_entries = get_user_entries(user_id)
+    
+    if len(all_entries) == 0:
         st.info("📝 No time entries yet. Start tracking time from the Dashboard!")
         return
     
@@ -33,11 +37,11 @@ def show_history():
     with col3:
         st.markdown("<br>", unsafe_allow_html=True)
         if st.button("🔍 Filter", use_container_width=True):
-            st.rerun()
+            pass # Rerun happens automatically
     
     # Filter entries
     filtered_entries = [
-        entry for entry in st.session_state.time_entries
+        entry for entry in all_entries
         if start_date <= datetime.fromisoformat(entry['clock_in']).date() <= end_date
     ]
     
